@@ -1,0 +1,16 @@
+import flet as ft
+
+def main(page: ft.Page):
+    page.title = "Hola Flet!"
+    txt = ft.Text(value="0", size=30)
+
+    def increment(e):
+        txt.value = str(int(txt.value) + 1)
+        page.update()
+
+    page.add(
+        txt,
+        ft.ElevatedButton("Incrementar", on_click=increment)
+    )
+
+ft.app(target=main)

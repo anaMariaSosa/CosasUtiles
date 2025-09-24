@@ -1,0 +1,29 @@
+# app.py
+from dash import Dash, dcc, html, Input, Output
+import plotly.express as px
+import pandas as pd
+
+df = pd.read_csv("sales.csv", parse_dates=["Fecha"])
+
+app = Dash(__name__)
+app.layout = html.Div([
+    html.H3("Dashboard de Ventas"),
+    dcc.Dropdown(df["Categoria"].unique(), multi=True, id="cat"),
+    dcc.Graph(id="graf"),
+    dcc.Slider(min=0, max=df["Ingreso"].max(), step=1000, value=0, id="min_ingreso"),
+])
+
+@app.callback(
+    Output("graf","figure"),
+    Input("cat","value"),
+    Input("min_ingreso","value")
+)
+def actualizar(cat, min_ing):
+    f = df.copy()
+    if cat: f = f[f["Categoria"].isin(cat)]
+    f = f[f["Ingreso"] >= (min_ing or 0)]
+    g = f.groupby("Fecha", as_index=False)["Ingreso"].sum()
+    return px.line(g, x="Fecha", y="Ingreso", title="Ingresos por fecha")
+
+if __name__ == "__main__":
+    app.run_server(debug=True)

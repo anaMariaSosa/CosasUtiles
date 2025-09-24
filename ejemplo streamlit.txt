@@ -1,0 +1,31 @@
+# streamlit_app.py
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+st.set_page_config(page_title="Ventas Dashboard", layout="wide")
+
+# Datos (ejemplo)
+df = pd.read_csv("sales.csv", parse_dates=["Fecha"])
+
+# Filtros
+col1, col2 = st.columns(2)
+categoria = col1.multiselect("Categoría", sorted(df["Categoria"].unique()), default=None)
+tienda = col2.multiselect("Tienda", sorted(df["Tienda"].unique()), default=None)
+
+f = df.copy()
+if categoria: f = f[f["Categoria"].isin(categoria)]
+if tienda:    f = f[f["Tienda"].isin(tienda)]
+
+# KPIs
+c1, c2, c3 = st.columns(3)
+c1.metric("Ingresos", f"${f['Ingreso'].sum():,.0f}")
+c2.metric("Unidades", int(f["Unidades"].sum()))
+c3.metric("Ticket medio", f"${(f['Ingreso'].sum()/max(len(f),1)) :,.0f}")
+
+# Gráfico
+fig = px.line(f.groupby("Fecha", as_index=False)["Ingreso"].sum(), x="Fecha", y="Ingreso", title="Ingresos por fecha")
+st.plotly_chart(fig, use_container_width=True)
+
+# Tabla
+st.dataframe(f)
