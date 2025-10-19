@@ -1,0 +1,52 @@
+import pandas as pd
+
+def piezas_por_presencia_segura(
+    f1: pd.DataFrame,
+    f2: pd.DataFrame,
+    f3: pd.DataFrame,
+    pieza_col: str,
+    en_f1: bool = True,
+    en_f2: bool = True,
+    en_f3: bool = True,
+    strip: bool = False,     # si True, elimina espacios en pieza
+    as_str: bool = False     # si True, convierte pieza a str
+) -> pd.DataFrame:
+    # --- 1) Extraer todas las piezas únicas de los 3 ficheros ---
+    def col(df):
+        if pieza_col not in df.columns:
+            # Si falta la columna, devuelve serie vacía (no rompe)
+            return pd.Series(dtype=object, name=pieza_col)
+        s = df[pieza_col].dropna()
+        if strip and s.dtype == object:
+            s = s.astype(str).str.strip()
+        if as_str:
+            s = s.astype(str)
+        return s
+
+    s1 = col(f1)
+    s2 = col(f2)
+    s3 = col(f3)
+
+    all_keys = pd.concat([s1, s2, s3], ignore_index=True).drop_duplicates()
+    keys = pd.DataFrame({pieza_col: all_keys}).reset_index(drop=True)
+
+    if keys.empty:
+        return keys  # sin piezas → retorno vacío
+
+    # --- 2) Calcular presencia con isin (siempre mismo largo que keys) ---
+    def presencia(df):
+        s = col(df).drop_duplicates()
+        return keys[pieza_col].isin(s)
+
+    m1 = presencia(f1)
+    m2 = presencia(f2)
+    m3 = presencia(f3)
+
+    # --- 3) Construir la máscara final según en_f1/en_f2/en_f3 ---
+    mask = pd.Series(True, index=keys.index)
+    mask &= (m1 if en_f1 else ~m1)
+    mask &= (m2 if en_f2 else ~m2)
+    mask &= (m3 if en_f3 else ~m3)
+
+    # --- 4) Devolver resultado alineado con keys ---
+    return keys.loc[mask, [pieza_col]].reset_index(drop=True)
