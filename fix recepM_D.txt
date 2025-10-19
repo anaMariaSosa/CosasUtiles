@@ -13,20 +13,25 @@ def chequear_primer_movimiento_no_valor(
     piezas_a_chequear: Optional[Union[pd.Series, pd.DataFrame, Iterable]] = None,
 ) -> pd.DataFrame:
     """
-    Chequea que el PRIMER movimiento en f1 NO puede ser un valor (X o Y) si se cumplen
-    condiciones de presencia (está / no está) en f2 y/o f3.
+    Valida que el PRIMER movimiento en f1 NO sea un valor prohibido (X/Y) condicionado
+    por la presencia en f2/f3. Solo se evalúan piezas existentes en f1.
 
-    Comportamiento clave:
-    - Si una pieza NO EXISTE en f1, NO se chequea (no hay violación posible).
-    - Si `piezas_a_chequear` está definido, se limita el universo a esas piezas;
-      las que no estén en f1 se ignoran (no se chequean).
-    - Si el valor del primer movimiento es NaN/None/"" se ignora la pieza (no se evalúa).
+    Reglas clave:
+    - Si la pieza NO existe en f1 → no se evalúa (no se devuelve).
+    - Si el primer valor (valor_col) es NaN/None/"" → no se evalúa (no se devuelve).
+    - La comprobación en f2/f3 se hace ÚNICAMENTE sobre las piezas de f1 (first_rows).
+
+    Nota sobre claves:
+    - Por simplicidad y seguridad, las columnas de clave en f2/f3 deben llamarse igual
+      que pieza_col. Si no coinciden, pasar None (para ignorar ese fichero) o renombrar
+      previamente en tu DataFrame. También puedes pasar el mismo nombre explícitamente.
     """
     if f1 is None or f1.empty:
         return pd.DataFrame(columns=[pieza_col, "fecha_primera", "valor_primero", "aplica_regla_f2", "aplica_regla_f3"])
 
     dft = _ensure_datetime(f1, fecha_col)
 
+    # Limitar universo si se proporciona (pero siempre restringido a f1)
     if piezas_a_chequear is not None:
         if isinstance(piezas_a_chequear, pd.DataFrame):
             if pieza_col not in piezas_a_chequear.columns:
@@ -40,6 +45,7 @@ def chequear_primer_movimiento_no_valor(
         if dft.empty:
             return pd.DataFrame(columns=[pieza_col, "fecha_primera", "valor_primero", "aplica_regla_f2", "aplica_regla_f3"])
 
+    # Primer movimiento por pieza (fecha mínima) exclusivamente de f1
     grp = dft.groupby(pieza_col)[fecha_col]
     if grp.ngroups == 0:
         return pd.DataFrame(columns=[pieza_col, "fecha_primera", "valor_primero", "aplica_regla_f2", "aplica_regla_f3"])
@@ -47,28 +53,36 @@ def chequear_primer_movimiento_no_valor(
     first_rows = dft.loc[grp.idxmin(), [pieza_col, fecha_col, valor_col]].copy()
     first_rows.rename(columns={fecha_col: "fecha_primera", valor_col: "valor_primero"}, inplace=True)
 
-    # ignorar piezas sin valor definido en el primer movimiento
+    # Si en f1 no hay valor para el primer movimiento, NO se evalúa nada
     first_rows = first_rows[first_rows["valor_primero"].notna() & (first_rows["valor_primero"].astype(str).str.strip() != "")]
     if first_rows.empty:
         return pd.DataFrame(columns=[pieza_col, "fecha_primera", "valor_primero", "aplica_regla_f2", "aplica_regla_f3"])
 
+    # Flags de aplicación de la regla (por defecto verdaderos y luego condicionados)
     first_rows["aplica_regla_f2"] = True
     first_rows["aplica_regla_f3"] = True
 
-    if condicion_en_f2 is not None and f2 is not None and not f2.empty:
-        ccols2 = [pieza_col] if clave_cols_f2 is None else ([clave_cols_f2] if isinstance(clave_cols_f2, str) else clave_cols_f2)
-        present_in_f2 = _presence_mask(first_rows[[pieza_col]], f2, ccols2).values
-        first_rows["aplica_regla_f2"] = (present_in_f2 == condicion_en_f2)
-    elif condicion_en_f2 is not None:
-        first_rows["aplica_regla_f2"] = False  # no se puede evaluar → no aplica
+    # --- Comprobación de presencia SOLO para piezas presentes en f1 (first_rows) ---
+    # Exigimos que clave en f2/f3 coincida por nombre con pieza_col para evitar errores
+    if condicion_en_f2 is not None:
+        if f2 is None or f2.empty:
+            first_rows["aplica_regla_f2"] = False
+        else:
+            if clave_cols_f2 is not None and ((isinstance(clave_cols_f2, str) and clave_cols_f2 != pieza_col) or (isinstance(clave_cols_f2, list) and clave_cols_f2 != [pieza_col])):
+                raise ValueError("Las claves de f2 deben llamarse igual que pieza_col o renombrarse previamente en f2.")
+            present_in_f2 = _presence_mask(first_rows[[pieza_col]], f2, [pieza_col]).values
+            first_rows["aplica_regla_f2"] = (present_in_f2 == condicion_en_f2)
 
-    if condicion_en_f3 is not None and f3 is not None and not f3.empty:
-        ccols3 = [pieza_col] if clave_cols_f3 is None else ([clave_cols_f3] if isinstance(clave_cols_f3, str) else clave_cols_f3)
-        present_in_f3 = _presence_mask(first_rows[[pieza_col]], f3, ccols3).values
-        first_rows["aplica_regla_f3"] = (present_in_f3 == condicion_en_f3)
-    elif condicion_en_f3 is not None:
-        first_rows["aplica_regla_f3"] = False
+    if condicion_en_f3 is not None:
+        if f3 is None or f3.empty:
+            first_rows["aplica_regla_f3"] = False
+        else:
+            if clave_cols_f3 is not None and ((isinstance(clave_cols_f3, str) and clave_cols_f3 != pieza_col) or (isinstance(clave_cols_f3, list) and clave_cols_f3 != [pieza_col])):
+                raise ValueError("Las claves de f3 deben llamarse igual que pieza_col o renombrarse previamente en f3.")
+            present_in_f3 = _presence_mask(first_rows[[pieza_col]], f3, [pieza_col]).values
+            first_rows["aplica_regla_f3"] = (present_in_f3 == condicion_en_f3)
 
+    # La regla aplica si todas las condiciones especificadas se cumplen
     masks = []
     if condicion_en_f2 is not None:
         masks.append(first_rows["aplica_regla_f2"])
@@ -78,6 +92,7 @@ def chequear_primer_movimiento_no_valor(
     for m in masks[1:]:
         aplica_regla = aplica_regla & m
 
+    # Violaciones: aplica_regla y valor_primero es prohibido
     violaciones = first_rows[aplica_regla & first_rows["valor_primero"].isin(set(valores_prohibidos))].copy()
     violaciones.sort_values(by=[pieza_col], inplace=True)
     violaciones.reset_index(drop=True, inplace=True)
