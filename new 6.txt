@@ -1,0 +1,162 @@
+def parse_equipment_file(file_path):
+    # Initialize lists to store data
+    equipment_data = []
+    current_equipment = {
+        'equipment_type': None,
+        'lri_type_code': None,
+        'keyword': None,
+        'lris': [],
+        'sw_configs': []
+    }
+    
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            # Parse EQUIPMENT section
+            if line == "EQUIPMENT":
+                current_equipment = {
+                    'equipment_type': None,
+                    'lri_type_code': None,
+                    'lris': [],
+                    'sw_configs': []
+                }
+                continue
+            # Skip empty lines and comment lines
+            if not line or line.startswith('#'):
+                continue
+            
+            # Parse equipment properties
+            if line.startswith(".equipment_type"):
+                current_equipment['equipment_type'] = line.split("=>")[1].strip()
+            elif line.startswith(".lri_type_code"):
+                current_equipment['lri_type_code'] = line.split("=>")[1].strip()
+
+            # Parse LRI_NO sections
+            elif line.startswith("LRI_NO"):
+                lri_num = int(re.search(r'LRI_NO\((\d+)\)', line).group(1))
+                lri_data = {'lri_num': lri_num}
+                current_equipment['lris'].append(lri_data)
+
+            # Parse LRI properties
+            elif line.startswith(".ident_code"):
+                current_equipment['lris'][-1]['ident_code'] = line.split("=>")[1].strip()
+
+            # Parse SW_CONFIG sections
+            elif line.startswith("SW_CONFIG"):
+                sw_num = int(re.search(r'SW_CONFIG\((\d+)\)', line).group(1))
+                sw_data = {
+                    'sw_num': sw_num,
+                    'module_files': [],
+                    'hw_versions': []
+                }
+                current_equipment['sw_configs'].append(sw_data)
+
+            # Parse SW_CONFIG properties
+            elif line.startswith(".sw_modification_code"):
+                current_equipment['sw_configs'][-1]['sw_modification_code'] = line.split("=>")[1].strip()
+
+            # Parse HW_VERSIONS sections
+            elif line.startswith("HW_VERSIONS"):
+                hw_num = int(re.search(r'HW_VERSIONS\((\d+)\)', line).group(1))
+                hw_data = {'hw_num': hw_num}
+                current_equipment['sw_configs'][-1]['hw_versions'].append(hw_data)
+
+            # Parse HW_VERSIONS properties
+            elif line.startswith(".hw_part_number"):
+                current_equipment['sw_configs'][-1]['hw_versions'][-1]['hw_part_number'] = line.split("=>")[1].strip()
+            elif line.startswith(".hw_part_number_code"):
+                current_equipment['sw_configs'][-1]['hw_versions'][-1]['hw_part_number_code'] = line.split("=>")[1].strip()
+
+            # When we reach the next EQUIPMENT section, save the current equipment
+
+            if line.startswith(".equipment_type"):
+                if len(current_equipment['sw_configs']) > 0:
+                    print(line)
+                    # Create rows for each LRI
+                    print ("eq")
+                    for lri in current_equipment['lris']:
+                        print ("lris yeiii")
+                        for sw_config in current_equipment['sw_configs']:
+                            print ("sw config yeiii")
+                            # Get the latest HW_VERSION (version > 1)
+                            hw_versions = [hv for hv in sw_config['hw_versions'] if hv.get('hw_num', 0) > 1]
+                            hw_version = hw_versions[-1] if hw_versions else None
+
+                            row = {
+                                'equipment_type': current_equipment['equipment_type'],
+                                'lri_type_code': current_equipment['lri_type_code'],
+                                'lri_num': lri['lri_num'],
+                                'ident_code': lri.get('ident_code'),
+                                'sw_part_number': sw_config.get('sw_part_number'),
+                                'sw_modification_code': sw_config.get('sw_modification_code'),
+                                'sw_modification_status': 0,
+                                'hw_part_number': hw_version.get('hw_part_number') if hw_version else None,
+                                'hw_part_number_code': hw_version.get('hw_part_number_code') if hw_version else None
+                            }
+                            equipment_data.append(row)
+                print(current_equipment)
+    # Create DataFrame
+    df = pd.DataFrame(equipment_data)
+    return df
+	
+#
+EQUIPMENT
+.equipment_type => ADT
+.lri_type_code => 2E
+.keyword => FFFF
+LRI_NO(1)
+.ident_code => A0
+.bus_ident => VOID
+.rt_address => 99
+LRI_NO(2)
+.ident_code => A1
+.bus_ident => VOID
+.rt_address => 99
+LRI_NO(3)
+.ident_code => A2
+.bus_ident => VOID
+.rt_address => 99
+LRI_NO(4)
+.ident_code => A3
+.bus_ident => VOID
+.rt_address => 99
+SW_CONFIG(1)
+.sw_part_number => 2193-03.02
+.sw_modification_code => 0302
+MODULE_FILE(1)
+.module_id => VOID
+.apsw_crcc => FFFFFFFF
+.hsmi_sa => 999
+.word_length => 1
+.file_id(1) => VOID
+MODULE_FILE(2)
+.module_id => CPM1_SC
+.apsw_crcc => FFFFFFFF
+.hsmi_sa => 2
+.word_length => 1
+.file_id(1) => p3e_s030F_cpm1_sc.sre
+MODULE_FILE(3)
+.module_id => CPM2_AP
+.apsw_crcc => FFFFFFFF
+.hsmi_sa => 3
+.word_length => 1
+.file_id(1) => p3e_s030F_cpm2_ap.sre
+HW_VERSIONS(1)
+.hw_part_number => 13-011-13
+.hw_part_number_code => 2E13
+HW_VERSIONS(2)
+.hw_part_number => EQP0631000080
+.hw_part_number_code => EF03
+SW_CONFIG(2)
+.sw_part_number => S993201-0200
+.sw_modification_code => 0200
+MODULE_FILE(1)
+.module_id => VOID
+.apsw_crcc => FFFFFFFF
+.hsmi_sa => 999
+.word_length => 1
+.file_id(1) => VOID
+HW_VERSIONS(1)
+.hw_part_number => 20003500
+.hw_part_number_code => D00A
+#
