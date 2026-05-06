@@ -1,0 +1,54 @@
+Service Availability and Data Durability Constraint
+
+The platform based on Kubernetes, Docker and OpenShift shall ensure a high level of service availability and data durability.
+
+The system shall be designed to achieve high availability by avoiding single points of failure and enabling automatic recovery mechanisms.
+
+In case of failure, the platform shall guarantee:
+- Automatic restart of failed components (self-healing)
+- Load distribution across multiple instances (horizontal scalability)
+- Zero or minimal service disruption for end users
+
+Regarding data persistence, the system shall ensure:
+- No data loss in case of application or container failure
+- Persistent storage backed by Kubernetes Persistent Volumes
+- Database durability and consistency through PostgreSQL mechanisms
+- Backup and recovery capabilities for disaster scenarios
+
+The application shall be deployed within the intranet environment, ensuring controlled access and compliance with enterprise security policies.
+
+
+
+✔ número de pods (replicas)
+✔ CPU / memoria (resources)
+✔ autoescalado (HPA)
+✔ almacenamiento persistente (PVC)
+✔ configuración de base de datos
+
+Pero:
+
+❌ NO existe un parámetro: availability = 99.9%
+❌ NO existe un parámetro: durability = alta
+
+👉 Eso son objetivos, no configuraciones.
+
+"La plataforma permite configurar los mecanismos necesarios para alcanzar alta disponibilidad y durabilidad, y la estrategia concreta está definida en 3.4.2.4"
+
+Platform Capability and Configuration Responsibility
+
+The selected PaaS platform based on Kubernetes, Docker and OpenShift provides the capability to configure key parameters such as:
+- Number of pod replicas
+- Resource allocation (CPU and memory)
+- Auto-scaling policies
+- Persistent storage and volume management
+
+These configuration capabilities enable the system to achieve the required levels of availability and data durability.
+
+The target availability and data durability levels are not intrinsic properties of the platform but are achieved through the correct configuration and deployment strategy of the application components.
+
+The specific strategy to ensure high availability and data durability is described in section 3.4.2.4.
+
+-->
+The platform allows the configuration of scalability, resource allocation and persistence mechanisms required to achieve high availability and data durability.
+Final availability and durability levels depend on the configuration of the platform resources and the deployment topology.
+The detailed implementation strategy is defined in section 3.4.2.4.
