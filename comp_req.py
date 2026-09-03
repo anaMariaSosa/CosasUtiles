@@ -6,10 +6,29 @@ import re
 # ============================================================
 # CONFIGURACIÓN
 # ============================================================
-
-REQUIREMENTS_COMPI = Path(
-    r"Z:\ruta\requirements_ultimo.txt"
+CARPETA_REQUIREMENTS_COMPI = Path(
+    r"Z:\ruta\carpeta_requirements_compi"
 )
+
+def obtener_requirement_mas_reciente():
+
+    archivos = list(
+        CARPETA_REQUIREMENTS_COMPI.glob("*.txt")
+    )
+
+    if not archivos:
+        raise FileNotFoundError(
+            f"No encuentro ningún .txt en:\n{CARPETA_REQUIREMENTS_COMPI}"
+        )
+
+    ultimo = max(
+        archivos,
+        key=lambda archivo: archivo.stat().st_mtime
+    )
+
+    return ultimo
+    
+REQUIREMENTS_COMPI = obtener_requirement_mas_reciente()
 
 MI_REQUIREMENTS = Path(
     r"C:\ruta\mi_repo\requirements.txt"
