@@ -1,0 +1,89 @@
+import xml.etree.ElementTree as ET
+import pandas as pd
+
+
+def _xml_table_to_dataframe(table):
+    """
+    Convierte un nodo <Table> del XML database_schema
+    en un DataFrame.
+    """
+
+    # Obtenemos los nombres de columnas definidos en <Fields>
+    columns = [
+        field.findtext("Name")
+        for field in table.find("Fields").findall("Field")
+    ]
+
+    rows = []
+
+    for row in table.findall("Row"):
+        row_data = {
+            column: row.findtext(column)
+            for column in columns
+        }
+
+        # Por seguridad: si aparece en Row algún campo que no estaba
+        # declarado en Fields, también lo conservamos.
+        for element in row:
+            if element.tag not in row_data:
+                row_data[element.tag] = element.text
+
+        rows.append(row_data)
+
+    return pd.DataFrame(rows)
+
+
+def transform_asset(file_path):
+    """
+    Transforma un XML database_schema en los tres DataFrames
+    utilizados por Asset.
+
+    Returns
+    -------
+    df_asset : pd.DataFrame
+        Tabla ASSET.
+
+    df_tci : pd.DataFrame
+        Tabla ASSET_LIFE_TYPE.
+
+    df_partitions : pd.DataFrame
+        Tabla ASSET_PRTN.
+    """
+
+    root = ET.parse(file_path).getroot()
+
+    tables = {
+        table.get("name"): table
+        for table in root.findall("Table")
+    }
+
+    required_tables = [
+        "ASSET",
+        "ASSET_LIFE_TYPE",
+        "ASSET_PRTN"
+    ]
+
+    missing_tables = [
+        table_name
+        for table_name in required_tables
+        if table_name not in tables
+    ]
+
+    if missing_tables:
+        raise ValueError(
+            f"Faltan tablas obligatorias en el XML: {missing_tables}"
+        )
+
+    df_asset = _xml_table_to_dataframe(
+        tables["ASSET"]
+    )
+
+    df_tci = _xml_table_to_dataframe(
+        tables["ASSET_LIFE_TYPE"]
+    )
+
+    df_partitions = _xml_table_to_dataframe(
+        tables["ASSET_PRTN"]
+    )
+
+    return df_asset, df_tci, df_partitions
